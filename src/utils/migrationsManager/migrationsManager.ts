@@ -25,7 +25,7 @@ export class MigrationsManager {
         return MigrationsManager._instance;
     }
 
-    public async makeMigrations(appName?: string): Promise<void> {
+    private async ensureVenvActive(): Promise<boolean> {
         if (!this.statusManager.isVenvActive()) {
             const choice = await vscode.window.showWarningMessage(
                 'L\'environnement virtuel doit être actif pour gérer les migrations.',
@@ -35,10 +35,19 @@ export class MigrationsManager {
 
             if (choice === 'Activer l\'environnement virtuel') {
                 await vscode.commands.executeCommand('django-helper.activateVenv');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            } else {
-                return;
+                // Attendre l'activation et vérifier le statut
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                return this.statusManager.isVenvActive();
             }
+            return false;
+        }
+        return true;
+    }
+
+    public async makeMigrations(appName?: string): Promise<void> {
+        if (!await this.ensureVenvActive()) {
+            vscode.window.showErrorMessage('Les migrations ne peuvent pas être créées sans un environnement virtuel actif.');
+            return;
         }
 
         const terminal = this.getOrCreateTerminal();
@@ -53,19 +62,9 @@ export class MigrationsManager {
     }
 
     public async migrate(appName?: string, migrationName?: string): Promise<void> {
-        if (!this.statusManager.isVenvActive()) {
-            const choice = await vscode.window.showWarningMessage(
-                'L\'environnement virtuel doit être actif pour gérer les migrations.',
-                'Activer l\'environnement virtuel',
-                'Annuler'
-            );
-
-            if (choice === 'Activer l\'environnement virtuel') {
-                await vscode.commands.executeCommand('django-helper.activateVenv');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            } else {
-                return;
-            }
+        if (!await this.ensureVenvActive()) {
+            vscode.window.showErrorMessage('Les migrations ne peuvent pas être appliquées sans un environnement virtuel actif.');
+            return;
         }
 
         const terminal = this.getOrCreateTerminal();
@@ -84,8 +83,8 @@ export class MigrationsManager {
     }
 
     public async showMigrations(): Promise<void> {
-        if (!this.statusManager.isVenvActive()) {
-            vscode.window.showErrorMessage('Activez l\'environnement virtuel pour voir les migrations.');
+        if (!await this.ensureVenvActive()) {
+            vscode.window.showErrorMessage('Impossible d\'afficher les migrations sans un environnement virtuel actif.');
             return;
         }
 

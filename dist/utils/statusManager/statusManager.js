@@ -40,6 +40,7 @@ const fs = __importStar(require("fs"));
 class StatusManager {
     constructor() {
         this.venvActive = false;
+        this.serverActive = false;
         this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
         this.statusBar.command = 'django-helper.toggleVenv';
         this.updateStatusBar();
@@ -57,19 +58,33 @@ class StatusManager {
         });
     }
     updateStatusBar() {
+        let text = '$(tools) Django: ';
+        text += this.venvActive ? '$(check) Env actif' : '$(x) Env inactif';
+        this.statusBar.text = text;
+        // Mettre en évidence quand l'environnement est actif
         if (this.venvActive) {
-            this.statusBar.text = '$(check) Venv Actif';
             this.statusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+            this.statusBar.tooltip = 'Cliquez pour désactiver l\'environnement virtuel';
         }
         else {
-            this.statusBar.text = '$(x) Venv Inactif';
             this.statusBar.backgroundColor = undefined;
+            this.statusBar.tooltip = 'Cliquez pour activer l\'environnement virtuel';
         }
         this.statusBar.show();
     }
     setVenvStatus(active) {
         this.venvActive = active;
         this.updateStatusBar();
+    }
+    getVenvStatus() {
+        return this.venvActive;
+    }
+    setServerStatus(active) {
+        this.serverActive = active;
+        this.updateStatusBar();
+    }
+    getServerStatus() {
+        return this.serverActive;
     }
     isVenvActive() {
         return this.venvActive;

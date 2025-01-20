@@ -8,18 +8,74 @@ import { MigrationsManager } from './utils/migrationsManager/migrationsManager';
 import { AppsManager } from './utils/appsManager/appsManager';
 import { VenvManager } from './utils/venvManager/venvManager';
 
-// Fonctions de gestion du venv
-async function createVirtualEnv() {
-    const terminal = vscode.window.activeTerminal || vscode.window.createTerminal();
-    terminal.sendText('python -m venv env');
-    terminal.show();
-    
-    // Attendre un peu que le venv soit créé avant de l'activer
-    setTimeout(() => {
-        terminal.sendText('.\\env\\Scripts\\activate');
-    }, 2000);
+const TERMINAL_NAME = 'Django Helper';
+let djangoTerminal: vscode.Terminal | undefined;
+
+function getDjangoTerminal(): vscode.Terminal {
+    if (!djangoTerminal || djangoTerminal.exitStatus !== undefined) {
+        djangoTerminal = vscode.window.createTerminal(TERMINAL_NAME);
+    }
+    return djangoTerminal;
 }
 
+let isActivatingVenv = false;
+
+// Fonctions de gestion du venv
+async function createVirtualEnv(): Promise<void> {
+    try {
+        // 1. Vérifier si un venv existe déjà
+        const existingVenv = checkVenvExists();
+        if (existingVenv) {
+            vscode.window.showInformationMessage(
+                'Un environnement virtuel existe déjà. Utilisez la commande "Activer Venv" pour l\'activer.'
+            );
+            return;
+        }
+
+        // 2. Créer et configurer le terminal
+        const terminal = vscode.window.createTerminal('Django Venv Setup');
+        terminal.show();
+
+        // 3. Créer le venv avec un nom standardisé
+        terminal.sendText('python -m venv .venv');
+        
+        // 4. Attendre la création
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // 5. Activer le venv avec le bon chemin selon la plateforme
+        const activateCommand = process.platform === 'win32' 
+            ? '.venv\\Scripts\\activate'
+            : 'source .venv/bin/activate';
+        terminal.sendText(activateCommand);
+
+        // 6. Attendre l'activation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // 7. Vérifier et installer requirements.txt
+        const workspacePath = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+        if (workspacePath) {
+            const requirementsPath = path.join(workspacePath, 'requirements.txt');
+            if (fs.existsSync(requirementsPath)) {
+                const installDeps = await vscode.window.showInformationMessage(
+                    'requirements.txt détecté. Installer les dépendances ?',
+                    'Oui', 'Non'
+                );
+                
+                if (installDeps === 'Oui') {
+                    terminal.sendText('pip install -r requirements.txt');
+                    vscode.window.showInformationMessage('Installation des dépendances en cours...');
+                }
+            }
+        }
+
+        // 8. Mettre à jour le statut
+        StatusManager.getInstance().setVenvStatus(true);
+        vscode.window.showInformationMessage('Environnement virtuel créé et activé avec succès');
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Erreur lors de la création du venv: ${error}`);
+    }
+}
 function checkVenvExists(): string | null {
     const workspacePath = vscode.workspace.rootPath;
     if (!workspacePath) return null;
@@ -47,33 +103,22 @@ async function activateVirtualEnv() {
     const venvPath = checkVenvExists();
     
     if (venvPath) {
-        const terminal = vscode.window.activeTerminal || vscode.window.createTerminal();
+        const terminal = getDjangoTerminal();
         const activateCommand = process.platform === 'win32'
-            ? `.\\env\\Scripts\\activate`
+            ? `${path.basename(venvPath)}\\Scripts\\activate`
             : `source "${path.join(venvPath, 'bin', 'activate')}"`;
         
         terminal.show();
         terminal.sendText(activateCommand);
         
-        // Attendez un peu que l'activation soit terminée
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Réduire le temps d'attente
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Vérifiez si l'activation a réussi en vérifiant l'existence de VIRTUAL_ENV
-        const checkTerminal = vscode.window.createTerminal({ name: 'Python Environment Check' });
-        checkTerminal.sendText('python -c "import os; print(os.environ.get(\'VIRTUAL_ENV\', \'\'))"');
-		
-		// Attendez un moment pour que la commande s'exécute
-		await new Promise(resolve => setTimeout(resolve, 1000));
-		
-		// Si nous arrivons ici, supposons que l'activation a réussi
-		// car nous avons déjà vérifié l'existence du venv avec checkVenvExists()
-		const result = venvPath;
-        
-        if (result.includes(venvPath)) {
-            vscode.window.showInformationMessage('Environnement virtuel activé');
-            StatusManager.getInstance().setVenvStatus(true);
-        } else {
-            vscode.window.showErrorMessage('Échec de l\'activation de l\'environnement virtuel');
+        StatusManager.getInstance().setVenvStatus(true);
+        vscode.window.setStatusBarMessage('Environnement virtuel activé', 3000);
+
+        if (isActivatingVenv) {
+            vscode.window.showInformationMessage('Environnement virtuel activé. Veuillez cliquer à nouveau sur le bouton pour lancer le serveur Django.');
         }
     } else {
         const create = await vscode.window.showInformationMessage(
@@ -89,15 +134,186 @@ async function activateVirtualEnv() {
 }
 
 async function deactivateVirtualEnv() {
-    const terminal = vscode.window.activeTerminal || vscode.window.createTerminal();
-    terminal.sendText('deactivate');
-    terminal.show();
+    const terminal = getDjangoTerminal();
+    const serverManager = ServerManager.getInstance();
+    
+    if (terminal) {
+        // Arrêter le serveur Django s'il est en cours d'exécution
+        if (serverManager.isServerRunning()) {
+            await serverManager.stopServer();
+        }
+
+        terminal.show();
+        terminal.sendText('deactivate');
+        
+        // Mettre à jour les statuts
+        StatusManager.getInstance().setVenvStatus(false);
+        StatusManager.getInstance().setServerStatus(false);
+        
+        const choice = await vscode.window.showInformationMessage(
+            'Environnement virtuel désactivé et serveur Django arrêté. Voulez-vous fermer le terminal ?',
+            'Oui',
+            'Non'
+        );
+        
+        if (choice === 'Oui') {
+            terminal.dispose();
+            djangoTerminal = undefined;
+        }
+    } else {
+        vscode.window.showInformationMessage('Aucun terminal Django Helper actif trouvé.');
+    }
 }
 
 async function toggleVenv() {
-    await VenvManager.getInstance().toggleVenv();
+    const statusManager = StatusManager.getInstance();
+    if (statusManager.isVenvActive()) {
+        await deactivateVirtualEnv();
+    } else {
+        await activateVirtualEnv();
+    }
     // Rafraîchir l'affichage après la bascule
     vscode.commands.executeCommand('django-helper.refreshVenvStatus');
+}
+
+// Ajouter cette fonction de vérification
+function isVenvActive(): boolean {
+    return StatusManager.getInstance().getVenvStatus();
+}
+
+async function checkAndInstallRequirements(terminal: vscode.Terminal): Promise<boolean> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+    if (!workspacePath) {
+        return false;
+    }
+
+    const requirementsPath = path.join(workspacePath, 'requirements.txt');
+    if (!fs.existsSync(requirementsPath)) {
+        // Si pas de requirements.txt, proposer de faire un pip freeze
+        const shouldFreeze = await vscode.window.showInformationMessage(
+            'Aucun fichier requirements.txt trouvé. Voulez-vous créer un fichier avec les dépendances actuelles ?',
+            'Oui',
+            'Non'
+        );
+
+        if (shouldFreeze === 'Oui') {
+            terminal.sendText('pip freeze > requirements.txt');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        return true;
+    }
+
+    // Vérifier si toutes les dépendances sont installées
+    terminal.sendText('pip install -r requirements.txt');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    return true;
+}
+
+async function ensureVenvActive(): Promise<boolean> {
+    if (!isVenvActive()) {
+        const message = await vscode.window.showErrorMessage(
+            'L\'environnement virtuel n\'est pas activé. Vous devez l\'activer avant d\'exécuter des commandes Django.',
+            'Activer l\'environnement',
+            'Annuler'
+        );
+        
+        if (message === 'Activer l\'environnement') {
+            await activateVirtualEnv();
+            // Vérifier à nouveau après l'activation
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Attendre que l'activation soit complète
+            return isVenvActive();
+        }
+        return false;
+    }
+    return true;
+}
+
+async function getVenvActivatedTerminal(name: string): Promise<vscode.Terminal | undefined> {
+    const venvPath = checkVenvExists();
+    if (!venvPath) {
+        vscode.window.showErrorMessage('Aucun environnement virtuel trouvé.');
+        return undefined;
+    }
+
+    const terminal = vscode.window.createTerminal(name);
+    const activateCommand = process.platform === 'win32'
+        ? `.\\${path.basename(venvPath)}\\Scripts\\activate.bat && `
+        : `source "${path.join(venvPath, 'bin', 'activate')}"; `;
+
+    // Attendre que l'activation soit terminée
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    return terminal;
+}
+
+async function startServer(context: vscode.ExtensionContext): Promise<void> {
+    if (isActivatingVenv) {
+        isActivatingVenv = false;
+        vscode.window.showInformationMessage('Environnement virtuel activé. Veuillez cliquer à nouveau pour lancer le serveur Django.');
+        return;
+    }
+
+    if (!isVenvActive()) {
+        isActivatingVenv = true;
+        const message = await vscode.window.showErrorMessage(
+            'L\'environnement virtuel n\'est pas activé. Vous devez l\'activer avant de lancer le serveur.',
+            'Activer l\'environnement',
+            'Annuler'
+        );
+        
+        if (message === 'Activer l\'environnement') {
+            await activateVirtualEnv();
+            return;
+        } else {
+            isActivatingVenv = false;
+            return;
+        }
+    }
+
+    const terminal = getDjangoTerminal();
+    terminal.show();
+
+    // Vérifier les dépendances avant de démarrer le serveur
+    const depsOk = await checkAndInstallRequirements(terminal);
+    if (!depsOk) {
+        vscode.window.showErrorMessage('Erreur lors de la vérification des dépendances');
+        return;
+    }
+
+    // Lancer le serveur
+    terminal.sendText('python manage.py runserver 8000');
+    
+    // Mettre à jour le statut du serveur
+    StatusManager.getInstance().setServerStatus(true);
+    const message = vscode.window.setStatusBarMessage('Serveur Django démarré', 3000);
+    context.subscriptions.push(message);
+}
+
+async function makeMigrations(appName?: string): Promise<void> {
+    if (!await ensureVenvActive()) {
+        vscode.window.showErrorMessage('Les migrations ne peuvent pas être créées sans un environnement virtuel actif.');
+        return;
+    }
+    
+    // ...rest of existing makeMigrations code...
+}
+
+async function migrate(appName?: string, migrationName?: string): Promise<void> {
+    if (!await ensureVenvActive()) {
+        vscode.window.showErrorMessage('Les migrations ne peuvent pas être appliquées sans un environnement virtuel actif.');
+        return;
+    }
+    
+    // ...rest of existing migrate code...
+}
+
+async function showMigrations(): Promise<void> {
+    if (!await ensureVenvActive()) {
+        vscode.window.showErrorMessage('Impossible d\'afficher les migrations sans un environnement virtuel actif.');
+        return;
+    }
+    
+    // ...rest of existing showMigrations code...
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -129,14 +345,16 @@ export function activate(context: vscode.ExtensionContext) {
             djangoTreeDataProvider.refresh();
         }),
 
-        vscode.commands.registerCommand('django-helper.startServer', () => {
-            serverManager.startServer();
+        vscode.commands.registerCommand('django-helper.startServer', async () => {
+            await startServer(context);
             djangoTreeDataProvider.refresh();
         }),
 
-        vscode.commands.registerCommand('django-helper.stopServer', () => {
-            serverManager.stopServer();
-            djangoTreeDataProvider.refresh();
+        vscode.commands.registerCommand('django-helper.stopServer', async () => {
+            if (await ensureVenvActive()) {
+                await serverManager.stopServer();
+                djangoTreeDataProvider.refresh();
+            }
         }),
 
         vscode.commands.registerCommand('django-helper.toggleVenv', () => {
@@ -144,12 +362,15 @@ export function activate(context: vscode.ExtensionContext) {
             djangoTreeDataProvider.refresh();
         }),
 
-        vscode.commands.registerCommand('django-helper.toggleServer', () => {
-            serverManager.toggleServer();
-            djangoTreeDataProvider.refresh();
+        vscode.commands.registerCommand('django-helper.toggleServer', async () => {
+            if (await ensureVenvActive()) {
+                await serverManager.toggleServer();
+                djangoTreeDataProvider.refresh();
+            }
         }),
 
         vscode.commands.registerCommand('django-helper.makemigrations', async () => {
+            if (!await ensureVenvActive()) return;
             const appName = await vscode.window.showInputBox({
                 prompt: 'Nom de l\'application (laissez vide pour toutes les applications)',
                 placeHolder: 'nom_app',
@@ -161,6 +382,7 @@ export function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('django-helper.migrate', async () => {
+            if (!await ensureVenvActive()) return;
             const appName = await vscode.window.showInputBox({
                 prompt: 'Nom de l\'application (laissez vide pour toutes les applications)',
                 placeHolder: 'nom_app',
@@ -180,12 +402,14 @@ export function activate(context: vscode.ExtensionContext) {
             djangoTreeDataProvider.refresh();
         }),
 
-        vscode.commands.registerCommand('django-helper.showmigrations', () => {
+        vscode.commands.registerCommand('django-helper.showmigrations', async () => {
+            if (!await ensureVenvActive()) return;
             migrationsManager.showMigrations();
             djangoTreeDataProvider.refresh();
         }),
 
         vscode.commands.registerCommand('django-helper.createApp', async () => {
+            if (!await ensureVenvActive()) return;
             const appName = await vscode.window.showInputBox({
                 prompt: 'Nom de la nouvelle application',
                 placeHolder: 'nom_app',
@@ -211,11 +435,21 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(...disposables);
 
+    context.subscriptions.push(
+        vscode.window.onDidCloseTerminal(terminal => {
+            if (terminal === djangoTerminal) {
+                djangoTerminal = undefined;
+            }
+        })
+    );
+
     // Vérifier l'état initial de l'environnement virtuel
     statusManager.checkVenvStatus();
     djangoTreeDataProvider.refresh();
 }
 
 export function deactivate() {
-    // Nettoyage des ressources si nécessaire
+    if (djangoTerminal) {
+        djangoTerminal.dispose();
+    }
 }
