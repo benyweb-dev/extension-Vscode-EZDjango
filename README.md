@@ -1,7 +1,7 @@
 # Django Helper pour VS Code
 
 ## Fonctionnalités
-truc.
+
 ### Gestion de l'environnement virtuel
 - Création automatique d'un environnement virtuel (`django-helper.createVenv`)
 - Activation/désactivation de l'environnement (`django-helper.activateVenv`, `django-helper.deactivateVenv`)
