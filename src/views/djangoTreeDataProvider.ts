@@ -77,6 +77,10 @@ export class DjangoTreeDataProvider implements vscode.TreeDataProvider<DjangoTre
                 return this.getServerInfo();
             case 'migrations':
                 return this.getMigrationsInfo();
+            case 'administration':
+                return this.getAdministrationInfo();
+            case 'dependencies':
+                return this.getDependenciesInfo();
             default:
                 return [];
         }
@@ -113,11 +117,18 @@ export class DjangoTreeDataProvider implements vscode.TreeDataProvider<DjangoTre
                 new vscode.ThemeIcon('package')
             ),
             new DjangoTreeItem(
-                'Configuration',
-                vscode.TreeItemCollapsibleState.Collapsed,
-                'settings',
+                'Administration',
+                vscode.TreeItemCollapsibleState.Expanded,
+                'administration',
                 undefined,
-                new vscode.ThemeIcon('settings')
+                new vscode.ThemeIcon('account')
+            ),
+            new DjangoTreeItem(
+                'Gestion des dépendances',
+                vscode.TreeItemCollapsibleState.Expanded,
+                'dependencies',
+                undefined,
+                new vscode.ThemeIcon('package')
             )
         ];
     }
@@ -417,6 +428,77 @@ export class DjangoTreeDataProvider implements vscode.TreeDataProvider<DjangoTre
             },
             new vscode.ThemeIcon('list-tree')
         ));
+
+        return items;
+    }
+
+    private async getAdministrationInfo(): Promise<DjangoTreeItem[]> {
+        return [
+            new DjangoTreeItem(
+                'Créer un superutilisateur',
+                vscode.TreeItemCollapsibleState.None,
+                'createSuperuser',
+                {
+                    command: 'django-helper.createSuperuser',
+                    title: 'Créer un superutilisateur Django'
+                },
+                new vscode.ThemeIcon('account')
+            ),
+            new DjangoTreeItem(
+                'Collecter les fichiers statiques',
+                vscode.TreeItemCollapsibleState.None,
+                'collectStatic',
+                {
+                    command: 'django-helper.collectStatic',
+                    title: 'Collecter les fichiers statiques'
+                },
+                new vscode.ThemeIcon('file-binary')
+            )
+        ];
+    }
+
+    private async getDependenciesInfo(): Promise<DjangoTreeItem[]> {
+        const isVenvActive = this.statusManager.isVenvActive();
+        const items = [
+            new DjangoTreeItem(
+                'Vérifier les dépendances',
+                vscode.TreeItemCollapsibleState.None,
+                'checkDependencies',
+                {
+                    command: 'django-helper.checkDependencies',
+                    title: 'Vérifier les dépendances Django'
+                },
+                new vscode.ThemeIcon('verify')
+            )
+        ];
+
+        if (isVenvActive) {
+            items.push(
+                new DjangoTreeItem(
+                    'Lister toutes les dépendances',
+                    vscode.TreeItemCollapsibleState.None,
+                    'listDependencies',
+                    {
+                        command: 'django-helper.listDependencies',
+                        title: 'Lister toutes les dépendances'
+                    },
+                    new vscode.ThemeIcon('list-tree')
+                )
+            );
+        } else {
+            items.push(
+                new DjangoTreeItem(
+                    'Activer l\'environnement virtuel du projet pour lister ses dépendances',
+                    vscode.TreeItemCollapsibleState.None,
+                    'activateVenvForDependencies',
+                    {
+                        command: 'django-helper.activateVenvForDependencies',
+                        title: 'Activer l\'environnement virtuel'
+                    },
+                    new vscode.ThemeIcon('activate')
+                )
+            );
+        }
 
         return items;
     }

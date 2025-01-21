@@ -97,6 +97,10 @@ class DjangoTreeDataProvider {
                     return this.getServerInfo();
                 case 'migrations':
                     return this.getMigrationsInfo();
+                case 'administration':
+                    return this.getAdministrationInfo();
+                case 'dependencies':
+                    return this.getDependenciesInfo();
                 default:
                     return [];
             }
@@ -109,7 +113,8 @@ class DjangoTreeDataProvider {
                 new DjangoTreeItem('Serveur Django', vscode.TreeItemCollapsibleState.Expanded, 'server', undefined, new vscode.ThemeIcon('radio-tower')),
                 new DjangoTreeItem('Migrations', vscode.TreeItemCollapsibleState.Expanded, 'migrations', undefined, new vscode.ThemeIcon('database')),
                 new DjangoTreeItem('Applications', vscode.TreeItemCollapsibleState.Expanded, 'apps', undefined, new vscode.ThemeIcon('package')),
-                new DjangoTreeItem('Configuration', vscode.TreeItemCollapsibleState.Collapsed, 'settings', undefined, new vscode.ThemeIcon('settings'))
+                new DjangoTreeItem('Administration', vscode.TreeItemCollapsibleState.Expanded, 'administration', undefined, new vscode.ThemeIcon('account')),
+                new DjangoTreeItem('Gestion des dépendances', vscode.TreeItemCollapsibleState.Expanded, 'dependencies', undefined, new vscode.ThemeIcon('package'))
             ];
         });
     }
@@ -289,6 +294,44 @@ class DjangoTreeDataProvider {
                 command: 'django-helper.showmigrations',
                 title: 'Show Migrations'
             }, new vscode.ThemeIcon('list-tree')));
+            return items;
+        });
+    }
+    getAdministrationInfo() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return [
+                new DjangoTreeItem('Créer un superutilisateur', vscode.TreeItemCollapsibleState.None, 'createSuperuser', {
+                    command: 'django-helper.createSuperuser',
+                    title: 'Créer un superutilisateur Django'
+                }, new vscode.ThemeIcon('account')),
+                new DjangoTreeItem('Collecter les fichiers statiques', vscode.TreeItemCollapsibleState.None, 'collectStatic', {
+                    command: 'django-helper.collectStatic',
+                    title: 'Collecter les fichiers statiques'
+                }, new vscode.ThemeIcon('file-binary'))
+            ];
+        });
+    }
+    getDependenciesInfo() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const isVenvActive = this.statusManager.isVenvActive();
+            const items = [
+                new DjangoTreeItem('Vérifier les dépendances', vscode.TreeItemCollapsibleState.None, 'checkDependencies', {
+                    command: 'django-helper.checkDependencies',
+                    title: 'Vérifier les dépendances Django'
+                }, new vscode.ThemeIcon('verify'))
+            ];
+            if (isVenvActive) {
+                items.push(new DjangoTreeItem('Lister toutes les dépendances', vscode.TreeItemCollapsibleState.None, 'listDependencies', {
+                    command: 'django-helper.listDependencies',
+                    title: 'Lister toutes les dépendances'
+                }, new vscode.ThemeIcon('list-tree')));
+            }
+            else {
+                items.push(new DjangoTreeItem('Activer l\'environnement virtuel du projet pour lister ses dépendances', vscode.TreeItemCollapsibleState.None, 'activateVenvForDependencies', {
+                    command: 'django-helper.activateVenvForDependencies',
+                    title: 'Activer l\'environnement virtuel'
+                }, new vscode.ThemeIcon('activate')));
+            }
             return items;
         });
     }

@@ -1,0 +1,21 @@
+pour créer un superutilisateur Django. Voici les étapes pour implémenter cette fonctionnalité :
+
+Nous allons ajouter une nouvelle fonction dans le fichier extension.ts.
+Nous ajouterons ensuite une nouvelle commande dans la fonction activate.
+Voici les modifications à apporter :
+
+extension.ts
+extension.ts+48-0
+Ces modifications apportent les changements suivants :
+
+Une nouvelle fonction createSuperuser qui gère la création d'un superutilisateur Django.
+Cette fonction vérifie d'abord si l'environnement virtuel est actif.
+Elle demande ensuite à l'utilisateur d'entrer le nom d'utilisateur, l'email et le mot de passe du superutilisateur.
+Elle utilise une variable d'environnement pour définir le mot de passe de manière sécurisée.
+Elle exécute la commande Django pour créer le superutilisateur.
+Une nouvelle commande django-helper.createSuperuser est ajoutée à la liste des disposables dans la fonction activate.
+Pour utiliser cette nouvelle commande, vous devrez également mettre à jour votre fichier package.json pour inclure la nouvelle commande dans la section contributes.commands. Voici comment vous pouvez le faire :
+
+package.json
+package.json+4-0
+Après ces modifications, les utilisateurs pourront créer un superutilisateur Django directement depuis VS Code en utilisant la commande palette et en sélectionnant "Django: Créer un superutilisateur".

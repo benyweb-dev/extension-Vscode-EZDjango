@@ -316,6 +316,120 @@ async function showMigrations(): Promise<void> {
     // ...rest of existing showMigrations code...
 }
 
+// Ajouter cette nouvelle fonction
+async function createSuperuser(): Promise<void> {
+    if (!await ensureVenvActive()) {
+        vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour créer un superutilisateur.');
+        return;
+    }
+
+    const username = await vscode.window.showInputBox({
+        prompt: 'Entrez le nom d\'utilisateur du superutilisateur',
+        placeHolder: 'admin'
+    });
+
+    if (!username) return;
+
+    const email = await vscode.window.showInputBox({
+        prompt: 'Entrez l\'adresse email du superutilisateur',
+        placeHolder: 'admin@example.com'
+    });
+
+    if (!email) return;
+
+    const password = await vscode.window.showInputBox({
+        prompt: 'Entrez le mot de passe du superutilisateur',
+        password: true
+    });
+
+    if (!password) return;
+
+    const terminal = getDjangoTerminal();
+    terminal.show();
+
+    // Utiliser une variable d'environnement pour le mot de passe
+    if (process.platform === 'win32') {
+        terminal.sendText(`$env:DJANGO_SUPERUSER_PASSWORD="${password}"`);
+    } else {
+        terminal.sendText(`export DJANGO_SUPERUSER_PASSWORD="${password}"`);
+    }
+
+    terminal.sendText(`python manage.py createsuperuser --noinput --username ${username} --email ${email}`);
+
+    vscode.window.showInformationMessage(`Superutilisateur "${username}" créé avec succès.`);
+}
+
+// Ajouter cette nouvelle fonction
+async function collectStatic(): Promise<void> {
+    if (!await ensureVenvActive()) {
+        vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour collecter les fichiers statiques.');
+        return;
+    }
+
+    const terminal = getDjangoTerminal();
+    terminal.show();
+
+    const confirmation = await vscode.window.showWarningMessage(
+        'Êtes-vous sûr de vouloir collecter les fichiers statiques ? Cette action peut écraser des fichiers existants.',
+        'Oui', 'Non'
+    );
+
+    if (confirmation === 'Oui') {
+        terminal.sendText('python manage.py collectstatic --noinput');
+        vscode.window.showInformationMessage('Collecte des fichiers statiques en cours...');
+    }
+}
+
+// Ajouter cette nouvelle fonction
+async function checkDjangoDependencies(): Promise<void> {
+    if (!await ensureVenvActive()) {
+        vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour vérifier les dépendances.');
+        return;
+    }
+
+    const terminal = getDjangoTerminal();
+    terminal.show();
+
+    // Lister les dépendances installées
+    terminal.sendText('pip list');
+
+    // Vérifier si Django est installé
+    terminal.sendText('pip show django');
+
+    const regenerateRequirements = await vscode.window.showInformationMessage(
+        'Voulez-vous régénérer le fichier requirements.txt ?',
+        'Oui',
+        'Non'
+    );
+
+    if (regenerateRequirements === 'Oui') {
+        terminal.sendText('pip freeze > requirements.txt');
+        vscode.window.showInformationMessage('Le fichier requirements.txt a été mis à jour.');
+    }
+}
+
+// Ajouter cette nouvelle fonction
+async function listAllDependencies(): Promise<void> {
+    if (!await ensureVenvActive()) {
+        vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour lister les dépendances.');
+        return;
+    }
+
+    const terminal = getDjangoTerminal();
+    terminal.show();
+
+    // Lister toutes les dépendances installées
+    terminal.sendText('pip list');
+}
+
+// Ajouter cette nouvelle fonction
+async function activateVenvForDependencies(): Promise<void> {
+    await activateVirtualEnv();
+    vscode.commands.executeCommand('django-helper.refreshVenvStatus');
+    const djangoTreeDataProvider = new DjangoTreeDataProvider();
+    djangoTreeDataProvider.refresh();
+}
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('Extension "Django Helper" est maintenant active!');
 
@@ -430,6 +544,30 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('django-helper.refreshVenvStatus', () => {
             StatusManager.getInstance().checkVenvStatus();
             djangoTreeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('django-helper.createSuperuser', async () => {
+            await createSuperuser();
+            djangoTreeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('django-helper.collectStatic', async () => {
+            await collectStatic();
+            djangoTreeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('django-helper.checkDependencies', async () => {
+            await checkDjangoDependencies();
+            djangoTreeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('django-helper.listDependencies', async () => {
+            await listAllDependencies();
+            djangoTreeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('django-helper.activateVenvForDependencies', async () => {
+            await activateVenvForDependencies();
         }),
     ];
 

@@ -43,6 +43,22 @@
       {
         "command": "django-helper.toggleServer",
         "title": "Django: Basculer le serveur"
+      },
+      {
+        "command": "django-helper.createSuperuser",
+        "title": "Django: Créer un superutilisateur"
+      },
+      {
+        "command": "django-helper.collectStatic",
+        "title": "Django: Collecter les fichiers statiques"
+      },
+      {
+        "command": "django-helper.checkDependencies",
+        "title": "Django: Vérifier les dépendances"
+      },
+      {
+        "command": "django-helper.listDependencies",
+        "title": "Django: Lister toutes les dépendances"
       }
     ],
     "viewsContainers": {

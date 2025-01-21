@@ -301,6 +301,102 @@ function showMigrations() {
         // ...rest of existing showMigrations code...
     });
 }
+// Ajouter cette nouvelle fonction
+function createSuperuser() {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!(yield ensureVenvActive())) {
+            vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour créer un superutilisateur.');
+            return;
+        }
+        const username = yield vscode.window.showInputBox({
+            prompt: 'Entrez le nom d\'utilisateur du superutilisateur',
+            placeHolder: 'admin'
+        });
+        if (!username)
+            return;
+        const email = yield vscode.window.showInputBox({
+            prompt: 'Entrez l\'adresse email du superutilisateur',
+            placeHolder: 'admin@example.com'
+        });
+        if (!email)
+            return;
+        const password = yield vscode.window.showInputBox({
+            prompt: 'Entrez le mot de passe du superutilisateur',
+            password: true
+        });
+        if (!password)
+            return;
+        const terminal = getDjangoTerminal();
+        terminal.show();
+        // Utiliser une variable d'environnement pour le mot de passe
+        if (process.platform === 'win32') {
+            terminal.sendText(`$env:DJANGO_SUPERUSER_PASSWORD="${password}"`);
+        }
+        else {
+            terminal.sendText(`export DJANGO_SUPERUSER_PASSWORD="${password}"`);
+        }
+        terminal.sendText(`python manage.py createsuperuser --noinput --username ${username} --email ${email}`);
+        vscode.window.showInformationMessage(`Superutilisateur "${username}" créé avec succès.`);
+    });
+}
+// Ajouter cette nouvelle fonction
+function collectStatic() {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!(yield ensureVenvActive())) {
+            vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour collecter les fichiers statiques.');
+            return;
+        }
+        const terminal = getDjangoTerminal();
+        terminal.show();
+        const confirmation = yield vscode.window.showWarningMessage('Êtes-vous sûr de vouloir collecter les fichiers statiques ? Cette action peut écraser des fichiers existants.', 'Oui', 'Non');
+        if (confirmation === 'Oui') {
+            terminal.sendText('python manage.py collectstatic --noinput');
+            vscode.window.showInformationMessage('Collecte des fichiers statiques en cours...');
+        }
+    });
+}
+// Ajouter cette nouvelle fonction
+function checkDjangoDependencies() {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!(yield ensureVenvActive())) {
+            vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour vérifier les dépendances.');
+            return;
+        }
+        const terminal = getDjangoTerminal();
+        terminal.show();
+        // Lister les dépendances installées
+        terminal.sendText('pip list');
+        // Vérifier si Django est installé
+        terminal.sendText('pip show django');
+        const regenerateRequirements = yield vscode.window.showInformationMessage('Voulez-vous régénérer le fichier requirements.txt ?', 'Oui', 'Non');
+        if (regenerateRequirements === 'Oui') {
+            terminal.sendText('pip freeze > requirements.txt');
+            vscode.window.showInformationMessage('Le fichier requirements.txt a été mis à jour.');
+        }
+    });
+}
+// Ajouter cette nouvelle fonction
+function listAllDependencies() {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!(yield ensureVenvActive())) {
+            vscode.window.showErrorMessage('L\'environnement virtuel doit être actif pour lister les dépendances.');
+            return;
+        }
+        const terminal = getDjangoTerminal();
+        terminal.show();
+        // Lister toutes les dépendances installées
+        terminal.sendText('pip list');
+    });
+}
+// Ajouter cette nouvelle fonction
+function activateVenvForDependencies() {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield activateVirtualEnv();
+        vscode.commands.executeCommand('django-helper.refreshVenvStatus');
+        const djangoTreeDataProvider = new djangoTreeDataProvider_1.DjangoTreeDataProvider();
+        djangoTreeDataProvider.refresh();
+    });
+}
 function activate(context) {
     console.log('Extension "Django Helper" est maintenant active!');
     // Initialiser les gestionnaires
@@ -402,6 +498,25 @@ function activate(context) {
             statusManager_1.StatusManager.getInstance().checkVenvStatus();
             djangoTreeDataProvider.refresh();
         }),
+        vscode.commands.registerCommand('django-helper.createSuperuser', () => __awaiter(this, void 0, void 0, function* () {
+            yield createSuperuser();
+            djangoTreeDataProvider.refresh();
+        })),
+        vscode.commands.registerCommand('django-helper.collectStatic', () => __awaiter(this, void 0, void 0, function* () {
+            yield collectStatic();
+            djangoTreeDataProvider.refresh();
+        })),
+        vscode.commands.registerCommand('django-helper.checkDependencies', () => __awaiter(this, void 0, void 0, function* () {
+            yield checkDjangoDependencies();
+            djangoTreeDataProvider.refresh();
+        })),
+        vscode.commands.registerCommand('django-helper.listDependencies', () => __awaiter(this, void 0, void 0, function* () {
+            yield listAllDependencies();
+            djangoTreeDataProvider.refresh();
+        })),
+        vscode.commands.registerCommand('django-helper.activateVenvForDependencies', () => __awaiter(this, void 0, void 0, function* () {
+            yield activateVenvForDependencies();
+        })),
     ];
     context.subscriptions.push(...disposables);
     context.subscriptions.push(vscode.window.onDidCloseTerminal(terminal => {
