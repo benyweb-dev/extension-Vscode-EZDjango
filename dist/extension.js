@@ -41,7 +41,7 @@ const serverManager_1 = require("./utils/serverManager/serverManager");
 const djangoTreeDataProvider_1 = require("./views/djangoTreeDataProvider");
 const migrationsManager_1 = require("./utils/migrationsManager/migrationsManager");
 const appsManager_1 = require("./utils/appsManager/appsManager");
-const TERMINAL_NAME = 'Django Helper';
+const TERMINAL_NAME = 'Django-ENV Helper';
 let djangoTerminal;
 function getDjangoTerminal() {
     if (!djangoTerminal || djangoTerminal.exitStatus !== undefined) {

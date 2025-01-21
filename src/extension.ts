@@ -8,7 +8,7 @@ import { MigrationsManager } from './utils/migrationsManager/migrationsManager';
 import { AppsManager } from './utils/appsManager/appsManager';
 import { VenvManager } from './utils/venvManager/venvManager';
 
-const TERMINAL_NAME = 'Django Helper';
+const TERMINAL_NAME = 'Django-ENV Helper';
 let djangoTerminal: vscode.Terminal | undefined;
 
 function getDjangoTerminal(): vscode.Terminal {
