@@ -1,9 +1,10 @@
 {
   "name": "vscode-django-ENV-helper",
   "displayName": "Django-ENV Helper",
-  "description": "Gestion simplifiée des projets Django dans VS Code",
+  "description": "Gestion simplifiée des projets Django dans VS Code dans un environnement virtuel",
   "version": "0.1.0",
   "publisher": "EZDjango",
+  "icon": "resources/django-icon-svgrepo-com.png",
   "engines": {
     "vscode": "^1.80.0"
   },
